@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apostas Esportivas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Roboto:wght@400;700&family=Teko:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root { --background-dark: #1a1a1a; --panel-bg: #2a2a2e; --text-light: #f0f0f0; --accent-gold: #ffd700; --accent-blue: #00e5ff; }
+        body { font-family: 'Roboto', sans-serif; background-color: var(--background-dark); color: var(--text-light); display: flex; flex-direction: column; align-items: center; margin: 0; padding: 20px; }
+        .main-nav { font-family: 'Teko', sans-serif; font-size: 1.5em; margin-bottom: 20px; }
+        .main-nav a { color: var(--neon-blue); text-decoration: none; margin: 0 20px; transition: color 0.2s; }
+        .main-nav a.active { color: var(--gold); text-shadow: 0 0 5px var(--gold); }
+        .header h1 { font-family: 'Orbitron', sans-serif; font-size: 3.5em; color: var(--accent-gold); text-transform: uppercase; margin: 20px 0; letter-spacing: 2px; text-shadow: 0 0 10px var(--accent-gold); }
+        .match-container { display: flex; justify-content: space-around; width: 100%; max-width: 1200px; background: var(--panel-bg); border-radius: 15px; padding: 20px; box-shadow: 0 0 25px rgba(0, 229, 255, 0.2); }
+        .team-panel { width: 45%; text-align: center; padding: 20px; border: 2px solid #444; border-radius: 10px; }
+        .vs { font-family: 'Orbitron', sans-serif; font-size: 4em; display: flex; align-items: center; color: var(--accent-gold); }
+        .team-logo { max-height: 120px; margin-bottom: 15px; }
+        .team-name { font-family: 'Orbitron', sans-serif; font-size: 2em; margin-bottom: 20px; }
+        .player-list { list-style: none; padding: 15px; margin: 0; text-align: left; background: #1e1e21; border-radius: 5px; }
+        .player-list h3 { margin: 0 0 10px 0; font-size: 1.2em; text-transform: uppercase; color: var(--accent-blue); border-bottom: 2px solid var(--accent-blue); padding-bottom: 5px; }
+        .player-list li { padding: 8px 0; font-size: 1.1em; border-bottom: 1px solid #333; }
+        .player-list li:last-child { border-bottom: none; }
+        .betting-controls { margin-top: 30px; text-align: center; }
+        .betting-controls button { font-family: 'Orbitron', sans-serif; font-size: 1.5em; padding: 15px 40px; border: none; border-radius: 10px; margin: 0 15px; cursor: pointer; transition: all 0.3s ease; }
+        #result-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; flex-direction: column; text-align: center; z-index: 100; }
+        #result-text { font-size: 3em; }
+        #result-score { font-size: 5em; font-family: 'Orbitron', sans-serif; color: var(--accent-gold); }
+        #new-match-button { font-size: 1.5em; margin-top: 30px; padding: 15px 30px; cursor: pointer; background: var(--accent-blue); color: black; border: none; border-radius: 10px; }
+    </style>
+</head>
+<body>
+    <nav class="main-nav">
+        <a href="/">Tigrinho</a>
+        <a href="/sports" class="active">Apostas Esportivas</a>
+        <a href="/crash">Crash</a>
+    </nav>
+    <div class="header"><h1>Confronto Global</h1></div>
+    <div class="match-container">
+        <div class="team-panel">
+            <img src="{{ matchup.europe.logo }}" alt="Logo {{ matchup.europe.name }}" class="team-logo">
+            <h2 class="team-name" data-team-name="{{ matchup.europe.name }}">{{ matchup.europe.name }}</h2>
+            <ul class="player-list"><h3>Jogadores Chave</h3>{% for player in matchup.europe.players %}<li>{{ player }}</li>{% endfor %}</ul>
+        </div>
+        <div class="vs">VS</div>
+        <div class="team-panel">
+            <img src="{{ matchup.brazil.logo }}" alt="Logo {{ matchup.brazil.name }}" class="team-logo">
+            <h2 class="team-name" data-team-name="{{ matchup.brazil.name }}">{{ matchup.brazil.name }}</h2>
+            <ul class="player-list"><h3>Jogadores Chave</h3>{% for player in matchup.brazil.players %}<li>{{ player }}</li>{% endfor %}</ul>
+        </div>
+    </div>
+    <div class="betting-controls" id="betting-controls">
+        <h2>Quem Vai Vencer?</h2>
+        <button id="bet-europe-btn" style="background-color: #007bff; color: white;">Apostar em {{ matchup.europe.name }}</button>
+        <button id="bet-brazil-btn" style="background-color: #28a745; color: white;">Apostar em {{ matchup.brazil.name }}</button>
+        <p id="bet-status" style="margin-top: 20px; font-size: 1.2em;"></p>
+    </div>
+    <div id="result-overlay">
+        <h2 id="result-text"></h2>
+        <p id="result-score"></p>
+        <button id="new-match-button">Jogar Outra Partida</button>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        socket.on('connect', () => socket.emit('register_player'));
+        const betEuropeBtn = document.getElementById('bet-europe-btn');
+        const betBrazilBtn = document.getElementById('bet-brazil-btn');
+        const betStatus = document.getElementById('bet-status');
+        const resultOverlay = document.getElementById('result-overlay');
+        const europeTeamName = document.querySelector('[data-team-name="{{ matchup.europe.name }}"]').dataset.teamName;
+        const brazilTeamName = document.querySelector('[data-team-name="{{ matchup.brazil.name }}"]').dataset.teamName;
+        function placeBet(teamName) {
+            betStatus.innerText = `Aposta feita em ${teamName}. Aguardando o controlador...`;
+            betEuropeBtn.disabled = true;
+            betBrazilBtn.disabled = true;
+            socket.emit('place_bet', { team_name: teamName });
+        }
+        betEuropeBtn.addEventListener('click', () => placeBet(europeTeamName));
+        betBrazilBtn.addEventListener('click', () => placeBet(brazilTeamName));
+        socket.on('bet_result', (data) => {
+            document.getElementById('result-text').innerText = `${data.winner} Venceu!`;
+            document.getElementById('result-score').innerText = `Placar Final: ${data.score}`;
+            resultOverlay.style.display = 'flex';
+        });
+        document.getElementById('new-match-button').addEventListener('click', () => window.location.reload());
+    </script>
+</body>
+</html>
