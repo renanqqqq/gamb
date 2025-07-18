@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel do Controlador</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@700&family=Teko:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root { --gold: #FFD700; --dark-blue: #0d1a2d; --light-blue: #1f3a5f; --red: #dc3545; }
+        body { font-family: 'Roboto Condensed', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: var(--dark-blue); color: white; }
+        .controller-panel { background: #1f2b3d; border: 3px solid #b3a277; border-radius: 20px; padding: 30px; width: 600px; text-align: center; }
+        h1 { font-family: 'Teko', sans-serif; color: var(--gold); font-size: 3.5em; margin: 0 0 20px 0; text-shadow: 0 0 5px var(--gold); }
+        #status { font-size: 1.5em; min-height: 50px; display: flex; justify-content: center; align-items: center; margin-bottom: 20px; border-radius: 5px; background: #111a28; border: 2px solid var(--light-blue); }
+        .controls { display: none; border-top: 2px solid #444; padding-top: 15px; margin-top: 15px; }
+        .controls p { font-size: 1.2em; }
+        .controls button { font-family: 'Teko', sans-serif; font-size: 2.2em; padding: 15px 20px; border: none; border-radius: 10px; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 5px 0 #111; }
+        .controls button:active { transform: translateY(3px); box-shadow: 0 2px 0 #111; }
+        #slot-controls button { width: 45%; margin: 5px; }
+        #winButton { background: linear-gradient(180deg, #28a745, #218838); color: white; }
+        #loseButton { background: linear-gradient(180deg, #dc3545, #c82333); color: white; }
+        #sports-controls button { width: 45%; margin: 5px; background: linear-gradient(180deg, #007bff, #0056b3); color: white; }
+        #crash-multiplier { font-size: 3em; color: var(--gold); margin-bottom: 15px; font-family: 'Teko'; }
+        #crash-button { width: 90%; background: linear-gradient(180deg, var(--red), #a71d2a); color: white; }
+    </style>
+</head>
+<body>
+    <div class="controller-panel">
+        <h1>PAINEL DO CONTROLADOR</h1>
+        <div id="status">Aguardando ação do jogador...</div>
+        <!-- Controles do Tigrinho -->
+        <div id="slot-controls" class="controls">
+            <p>Giro do Tigrinho detectado. Escolha o resultado:</p>
+            <button id="winButton">GANHAR</button>
+            <button id="loseButton">PERDER</button>
+        </div>
+        <!-- Controles de Apostas Esportivas -->
+        <div id="sports-controls" class="controls">
+            <p id="sports-bet-info"></p>
+            <button id="team1-wins-btn"></button>
+            <button id="team2-wins-btn"></button>
+        </div>
+        <!-- Controles do Crash -->
+        <div id="crash-controls" class="controls">
+            <p id="crash-info-msg"></p>
+            <div id="crash-multiplier">1.00x</div>
+            <button id="crash-button">QUEBRAR AGORA</button>
+        </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        const statusDiv = document.getElementById('status');
+        const allControls = document.querySelectorAll('.controls');
+        socket.on('connect', () => socket.emit('register_controller'));
+
+        function hideAllControls() { allControls.forEach(c => c.style.display = 'none'); }
+
+        socket.on('decision_request', (data) => {
+            hideAllControls();
+            if (data.type === 'slot') {
+                document.getElementById('slot-controls').style.display = 'block';
+                statusDiv.textContent = "Jogador girou o Tigrinho!";
+            } else if (data.type === 'sports') {
+                const sportsControls = document.getElementById('sports-controls');
+                document.getElementById('sports-bet-info').textContent = data.msg;
+                const team1Btn = document.getElementById('team1-wins-btn');
+                const team2Btn = document.getElementById('team2-wins-btn');
+                team1Btn.textContent = `${data.match.europe.name} Vence`;
+                team1Btn.dataset.winner = data.match.europe.name;
+                team2Btn.textContent = `${data.match.brazil.name} Vence`;
+                team2Btn.dataset.winner = data.match.brazil.name;
+                sportsControls.style.display = 'block';
+                statusDiv.textContent = "Jogador fez uma aposta esportiva!";
+            } else if (data.type === 'crash_start') {
+                const crashControls = document.getElementById('crash-controls');
+                document.getElementById('crash-info-msg').textContent = data.msg;
+                document.getElementById('crash-multiplier').textContent = '1.00x';
+                crashControls.style.display = 'block';
+                statusDiv.textContent = "O jogo Crash está AO VIVO!";
+            }
+        });
+        socket.on('crash_update', (data) => {
+            const crashMultiplier = document.getElementById('crash-multiplier');
+            if (crashMultiplier) crashMultiplier.textContent = data.multiplier;
+        });
+        socket.on('game_ended', (data) => {
+            hideAllControls();
+            statusDiv.textContent = `O jogo ${data.type} terminou. Aguardando...`;
+        });
+        
+        document.getElementById('winButton').addEventListener('click', () => { socket.emit('decision', { outcome: 'win' }); hideAllControls(); statusDiv.textContent = 'GANHAR enviado. Aguardando...'; });
+        document.getElementById('loseButton').addEventListener('click', () => { socket.emit('decision', { outcome: 'lose' }); hideAllControls(); statusDiv.textContent = 'PERDER enviado. Aguardando...'; });
+        document.getElementById('team1-wins-btn').addEventListener('click', (e) => { socket.emit('sports_decision', { winner: e.target.dataset.winner }); hideAllControls(); statusDiv.textContent = 'Resultado enviado. Aguardando...'; });
+        document.getElementById('team2-wins-btn').addEventListener('click', (e) => { socket.emit('sports_decision', { winner: e.target.dataset.winner }); hideAllControls(); statusDiv.textContent = 'Resultado enviado. Aguardando...'; });
+        document.getElementById('crash-button').addEventListener('click', () => { socket.emit('crash_decision'); hideAllControls(); statusDiv.textContent = 'Sinal de QUEBRA enviado!'; });
+    </script>
+</body>
+</html>

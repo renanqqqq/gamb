@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo do Tigrinho</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@700&family=Teko:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root { --gold: #FFD700; --dark-blue: #0d1a2d; --neon-blue: #00e5ff; }
+        body { font-family: 'Roboto Condensed', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background-color: var(--dark-blue); color: white; }
+        .main-nav { position: absolute; top: 20px; left: 20px; font-family: 'Teko', sans-serif; font-size: 1.5em; }
+        .main-nav a { color: var(--neon-blue); text-decoration: none; margin-right: 20px; transition: color 0.2s; }
+        .main-nav a.active { color: var(--gold); text-shadow: 0 0 5px var(--gold); }
+        .machine { background: linear-gradient(to bottom, #2c3e50, #1a2533); border: 5px solid #b3a277; border-radius: 20px; padding: 20px 40px; box-shadow: 0 0 15px rgba(0,0,0,0.5), inset 0 0 20px rgba(0,0,0,0.4); text-align: center; }
+        h1 { font-family: 'Teko', sans-serif; color: var(--gold); font-size: 4em; margin: 0 0 10px 0; letter-spacing: 2px; text-shadow: 0 0 10px var(--gold); }
+        .reels-container { background: #000; border: 4px solid #333; border-radius: 10px; padding: 15px; margin-bottom: 25px; box-shadow: inset 0 0 15px rgba(0,0,0,0.7); }
+        .reels { display: flex; justify-content: center; }
+        .reel { width: 100px; height: 120px; background: #e0e0e0; border: 3px solid #555; border-radius: 10px; margin: 0 10px; font-size: 80px; line-height: 120px; text-align: center; overflow: hidden; }
+        #status { font-size: 1.8em; font-weight: bold; height: 40px; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; color: var(--neon-blue); text-shadow: 0 0 8px var(--neon-blue); }
+        #spinButton { font-family: 'Teko', sans-serif; font-size: 2.5em; padding: 10px 60px; border: none; border-radius: 10px; color: #2c3e50; background: linear-gradient(180deg, var(--gold), #b3a277); cursor: pointer; transition: all 0.2s ease; box-shadow: 0 5px 0 #8c7b5a; }
+        #spinButton:disabled { background: #777; color: #aaa; cursor: not-allowed; box-shadow: 0 5px 0 #555; }
+        @keyframes winGlow { from { box-shadow: 0 0 15px rgba(0,0,0,0.5), 0 0 20px var(--gold); } to { box-shadow: 0 0 35px var(--gold), 0 0 50px var(--gold); } }
+        .win-glow { animation: winGlow 1.5s ease-in-out alternate; }
+    </style>
+</head>
+<body>
+    <nav class="main-nav">
+        <a href="/" class="active">Tigrinho</a>
+        <a href="/sports">Apostas Esportivas</a>
+        <a href="/crash">Crash</a>
+    </nav>
+    <div class="machine" id="slotMachine">
+        <h1>TIGRINHO</h1>
+        <div class="reels-container">
+            <div class="reels"><div class="reel">🐯</div><div class="reel">💰</div><div class="reel">💎</div></div>
+        </div>
+        <div id="status">Pressione Girar para Começar!</div>
+        <button id="spinButton">GIRAR</button>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        const spinButton = document.getElementById('spinButton');
+        const statusDiv = document.getElementById('status');
+        const machine = document.getElementById('slotMachine');
+        const reels = document.querySelectorAll('.reel');
+        const symbols = ['🐯', '🍊', '🔔', '🍀', '💎', '💰'];
+        socket.on('connect', () => socket.emit('register_player'));
+
+        function startSpinAnimation() {
+            spinInterval = setInterval(() => {
+                reels.forEach(reel => { reel.textContent = symbols[Math.floor(Math.random() * symbols.length)]; });
+            }, 80);
+        }
+        function stopSpinAnimation(outcome) {
+            clearInterval(spinInterval);
+            machine.classList.remove('win-glow');
+            if (outcome === 'win') {
+                statusDiv.textContent = '!!! PRÊMIO MÁXIMO !!!';
+                reels.forEach(reel => reel.textContent = '💎');
+                machine.classList.add('win-glow');
+            } else {
+                statusDiv.textContent = 'Mais Sorte na Próxima';
+                reels[0].textContent = '🍊'; reels[1].textContent = '🔔'; reels[2].textContent = '🍀';
+            }
+            spinButton.disabled = false;
+        }
+        spinButton.addEventListener('click', () => {
+            statusDiv.textContent = 'GIRANDO...';
+            spinButton.disabled = true;
+            startSpinAnimation();
+            socket.emit('spin');
+        });
+        socket.on('spin_result', (data) => { setTimeout(() => stopSpinAnimation(data.outcome), 1500); });
+    </script>
+</body>
+</html>

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo Crash</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&family=Teko:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg-color: #1a2230; --panel-color: #212b3d; --green: #28a745; --red: #dc3545; --gold: #ffc107; --text-color: #f0f0f0; }
+        body { font-family: 'Poppins', sans-serif; background-color: var(--bg-color); color: var(--text-color); display: flex; flex-direction: column; align-items: center; margin: 0; padding: 20px; }
+        .main-nav { font-family: 'Teko', sans-serif; font-size: 1.5em; margin-bottom: 20px; }
+        .main-nav a { text-decoration: none; margin: 0 20px; color: var(--gold); transition: color 0.2s; }
+        .main-nav a.active { color: white; text-shadow: 0 0 5px white; }
+        .crash-container { width: 100%; max-width: 800px; background: var(--panel-color); border-radius: 15px; padding: 20px; }
+        .graph-area { position: relative; height: 400px; background-color: #161d28; border-radius: 10px; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+        #multiplier-display { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 6em; z-index: 2; transition: color 0.3s ease; }
+        .controls { text-align: center; margin-top: 20px; }
+        .bet-input { width: 150px; font-size: 1.5em; padding: 10px; border-radius: 5px; border: 2px solid #444; background: #333; color: white; text-align: center; }
+        .chip-icon { font-size: 2em; vertical-align: middle; }
+        #action-button { font-family: 'Poppins', sans-serif; font-weight: 600; font-size: 2em; padding: 20px 60px; border-radius: 10px; border: none; cursor: pointer; margin-top: 15px; width: 80%; transition: all 0.2s ease; }
+        .btn-play { background: var(--gold); color: black; }
+        .btn-cashout { background: var(--green); color: white; }
+        .btn-cashed-out { background: #007bff; color: white; cursor: not-allowed; }
+        .btn-disabled { background: #555; color: #999; cursor: not-allowed; }
+        #status-message { font-size: 1.2em; margin-top: 15px; height: 30px; }
+    </style>
+</head>
+<body>
+    <nav class="main-nav">
+        <a href="/">Tigrinho</a>
+        <a href="/sports">Apostas Esportivas</a>
+        <a href="/crash" class="active">Crash</a>
+    </nav>
+    <div class="crash-container">
+        <div class="graph-area"><div id="multiplier-display">1.00x</div></div>
+        <div class="controls">
+            <label style="font-size: 1.2em;">Valor da Aposta:</label><br>
+            <span class="chip-icon">💰</span>
+            <input type="number" id="bet" class="bet-input" value="100">
+            <button id="action-button" class="btn-play">Apostar e Jogar</button>
+            <div id="status-message">Faça sua aposta para iniciar a rodada!</div>
+        </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        const multiplierDisplay = document.getElementById('multiplier-display');
+        const actionButton = document.getElementById('action-button');
+        const statusMessage = document.getElementById('status-message');
+        const betInput = document.getElementById('bet');
+        socket.on('connect', () => socket.emit('register_player'));
+        actionButton.addEventListener('click', () => {
+            if (actionButton.classList.contains('btn-play')) {
+                socket.emit('start_crash');
+                actionButton.className = 'btn-disabled';
+                actionButton.textContent = 'Aguardando rodada...';
+                actionButton.disabled = true;
+                betInput.disabled = true;
+            } else if (actionButton.classList.contains('btn-cashout')) {
+                socket.emit('cashout');
+            }
+        });
+        socket.on('crash_update', (data) => {
+            if (actionButton.classList.contains('btn-disabled')) {
+                actionButton.className = 'btn-cashout';
+                actionButton.textContent = 'RETIRAR APOSTA';
+                actionButton.disabled = false;
+                statusMessage.textContent = 'Boa sorte!';
+            }
+            if (!actionButton.classList.contains('btn-cashed-out')) {
+                multiplierDisplay.textContent = data.multiplier;
+            }
+        });
+        socket.on('cashout_success', (data) => {
+            actionButton.className = 'btn-cashed-out';
+            actionButton.textContent = `Retirado em ${data.multiplier}`;
+            actionButton.disabled = true;
+            const winnings = Math.round(parseFloat(betInput.value) * parseFloat(data.multiplier.replace('x','')));
+            statusMessage.textContent = `SUCESSO! Você ganhou ${winnings} fichas!`;
+            multiplierDisplay.style.color = 'var(--green)';
+        });
+        socket.on('crash_event', (data) => {
+            multiplierDisplay.style.color = 'var(--red)';
+            multiplierDisplay.textContent = `QUEBROU EM ${data.multiplier}`;
+            if (!data.cashed_out) {
+                actionButton.className = 'btn-disabled';
+                actionButton.textContent = 'QUEBROU';
+                actionButton.disabled = true;
+                statusMessage.textContent = 'Você perdeu sua aposta! Mais sorte na próxima vez.';
+            } else {
+                statusMessage.textContent += ` (Quebra final: ${data.multiplier})`;
+            }
+        });
+        socket.on('crash_ready', () => {
+            actionButton.className = 'btn-play';
+            actionButton.textContent = 'Apostar e Jogar';
+            actionButton.disabled = false;
+            betInput.disabled = false;
+            multiplierDisplay.textContent = '1.00x';
+            multiplierDisplay.style.color = 'var(--text-color)';
+            statusMessage.textContent = 'Faça sua aposta para iniciar a próxima rodada!';
+        });
+    </script>
+</body>
+</html>
